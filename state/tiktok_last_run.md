@@ -1,3 +1,3 @@
-# TikTok last run 2026-10-17T13:21:42.326504Z
+# TikTok last run 2026-10-17T14:22:43.206736Z
 
-- TikTok posting is off in config.json.
+- TikTok connected. Scopes: user.info.basic,video.publish,video.upload; refresh token valid 365 days.
