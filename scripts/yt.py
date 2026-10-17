@@ -24,11 +24,16 @@ def save(name, data):
     STATE.mkdir(exist_ok=True)
     (STATE / name).write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
+def clean(v):
+    return v.strip().strip('"').strip("'").strip()
+
 def token():
+    cid, sec, rt = (clean(os.environ.get(k, "")) for k in ("YT_CLIENT_ID", "YT_CLIENT_SECRET", "YT_REFRESH_TOKEN"))
+    # non-secret sanity info (no values are printed)
+    log(f"Check: client id starts {cid[:13]!r}, ends with googleusercontent.com: {cid.endswith('.apps.googleusercontent.com')}; "
+        f"secret starts GOCSPX-: {sec.startswith('GOCSPX-')}; refresh token starts 1//: {rt.startswith('1//')}, length {len(rt)}")
     r = requests.post("https://oauth2.googleapis.com/token", data={
-        "client_id": os.environ["YT_CLIENT_ID"],
-        "client_secret": os.environ["YT_CLIENT_SECRET"],
-        "refresh_token": os.environ["YT_REFRESH_TOKEN"],
+        "client_id": cid, "client_secret": sec, "refresh_token": rt,
         "grant_type": "refresh_token"}, timeout=60)
     if r.status_code != 200:
         log(f"TOKEN ERROR {r.status_code}: {r.text[:300]}")
