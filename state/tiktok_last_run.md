@@ -1,3 +1,3 @@
-# TikTok last run 2026-10-17T14:22:43.206736Z
+# TikTok last run 2026-10-17T14:30:18.238791Z
 
-- TikTok connected. Scopes: user.info.basic,video.publish,video.upload; refresh token valid 365 days.
+- TIKTOK SENT TO INBOX carlsen-sindarov (publish_id v_inbox_file~v2.7697643812000434189)
