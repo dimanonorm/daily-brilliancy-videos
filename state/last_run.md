@@ -1,6 +1,30 @@
-# Last run 2026-10-17T11:44:05.865215Z
+# Last run 2026-10-17T11:44:45.113392Z
 
-- TOKEN ERROR 400: {
-  "error": "invalid_grant",
-  "error_description": "Bad Request"
-}
+- Check: client id starts '524430009606-', ends with googleusercontent.com: True; secret starts GOCSPX-: True; refresh token starts 1//: True, length 103
+- Channel: UCBm9LSHTKngWFpY_yLgouew
+- YouTube upload is switched off in config.json (waiting for Google's API audit).
+- Already has comment: OhFgTrieIvk (Magnus Carlsen's Brilliancy Against Javokhir Sindarov)
+- Already has comment: hWYUpo6GOjg (Magnus Finds a Brilliant Move Against Matyakubov)
+- Already has comment: J8K0qk7KFe0 (Magnus Strikes Again With a Brilliant Move Against Lazavik)
+- Already has comment: mAc89yL-JN8 (Magnus Carlsen's Brilliant Move Against Sklokin-Bagiyan)
+- Already has comment: QvkuYKahYas (Magnus Carlsen Stuns Vugar Rasulov With a Brilliant Move)
+- Already has comment: GZ-r1ZRLheI (Hikaru's Brilliancy Against Dmitry Andreikin)
+- Already has comment: Mfq6rvW9UX0 (Hikaru Stuns Swayham Das With a Brilliant Move)
+- Already has comment: yx_jWS9oaCQ (Hikaru Finds a Brilliant Move Against Tuan Minh Le)
+- Already has comment: bZigF_6jenI (Hikaru Strikes With a Brilliant Move Against Christopher Yoo)
+- Already has comment: pcQLmxW--eI (Hikaru's Brilliant Move Against Nihal Sarin)
+- Already has comment: x1EU7d5jKcA (Tal's Brilliancy Against Georgi Orlov)
+- Already has comment: 1BWh4K_rTSo (The Magician From Riga Strikes Against Hjartarson)
+- Already has comment: Np_rjzWKjR0 (Tal Stuns Nick de Firmian With a Brilliant Move)
+- Already has comment: xnfw_TOt1C8 (Mikhail Tal Finds a Brilliant Move Against Gurevich)
+- Already has comment: n0LQcGtJd8E (Tal's Brilliant Move Against Siegfried Maus)
+- Already has comment: o_8IDXA3NY8 (Kasparov's Brilliant Move Against Pahljina)
+- Already has comment: jsafBDdyyRM (Kasparov Strikes Again With a Brilliant Move Against Short)
+- Already has comment: XVxFw_ePdqk (Kasparov Stuns Caruana With a Brilliant Move)
+- Already has comment: shk9OPa8vLw (Kasparov's Brilliancy Against Nigel Short)
+- Already has comment: WYy5U5gOGJk (Kasparov Finds a Brilliant Move Against Wesley So)
+- Already has comment: Xx73aliGrsc (Capablanca's Stunning Brilliancy Against Van Scheltinga)
+- Already has comment: J8eOFLZoB9o (Capablanca Strikes With a Brilliant Move Against Vassaux)
+- Already has comment: f6gP0Qxozuw (Capablanca Plays a Brilliant Move Against Czerniak)
+- Already has comment: A7S4LUCbM2I (Capablanca Finds a Brilliant Move Against Anonymous)
+- Already has comment: _fZEraDpuDg (Capablanca's Brilliant Move Against Forsberg)
