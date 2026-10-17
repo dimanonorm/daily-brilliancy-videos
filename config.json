@@ -5,5 +5,5 @@
   "categoryId": "20",
   "max_uploads_per_run": 5,
   "check_last_n": 25,
-  "tiktok_mode": "off"
+  "tiktok_mode": "inbox"
 }
