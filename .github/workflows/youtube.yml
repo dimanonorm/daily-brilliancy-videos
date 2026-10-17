@@ -1,4 +1,4 @@
-name: YouTube publish & comment
+name: Publish (YouTube + TikTok)
 
 on:
   push:
@@ -17,7 +17,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: youtube
+  group: tiktok
   cancel-in-progress: false
 
 jobs:
@@ -37,6 +37,13 @@ jobs:
           YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
           FORCE_UPLOAD: ${{ inputs.force_upload && '1' || '0' }}
         run: python scripts/yt.py
+      - name: TikTok
+        if: always()
+        env:
+          TT_CLIENT_KEY: ${{ secrets.TT_CLIENT_KEY }}
+          TT_CLIENT_SECRET: ${{ secrets.TT_CLIENT_SECRET }}
+          TT_TOKEN_KEY: ${{ secrets.TT_TOKEN_KEY }}
+        run: python scripts/tiktok.py publish
       - name: Save state
         if: always()
         run: |

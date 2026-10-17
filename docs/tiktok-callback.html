@@ -1,0 +1,13 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex">
+<title>TikTok connected – Daily Brilliancy Uploader</title>
+<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:40px auto;padding:0 16px;line-height:1.6;color:#222}code{display:block;word-break:break-all;background:#f3f3f3;padding:12px;border-radius:8px;font-size:15px}button{margin-top:10px;padding:8px 16px;font-size:15px}</style></head><body>
+<h1>Daily Brilliancy Uploader – TikTok</h1>
+<div id="out"></div>
+<script>
+const p=new URLSearchParams(location.search);const o=document.getElementById('out');
+if(p.get('code')){o.innerHTML='<p>Authorization code (valid for a few minutes). Paste it into the GitHub workflow <b>"TikTok connect"</b> now:</p><code id="c"></code><button onclick="navigator.clipboard.writeText(document.getElementById(\'c\').textContent)">Copy code</button>';document.getElementById('c').textContent=p.get('code');}
+else if(p.get('error')){o.textContent='TikTok returned an error: '+p.get('error')+' – '+(p.get('error_description')||'');}
+else{o.textContent='This page receives the TikTok authorization code for the Daily Brilliancy Uploader.';}
+</script>
+<p><a href="./">Home</a> · <a href="privacy.html">Privacy Policy</a> · <a href="terms.html">Terms of Service</a></p>
+</body></html>
