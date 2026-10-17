@@ -1,0 +1,47 @@
+name: YouTube publish & comment
+
+on:
+  push:
+    branches: [main]
+    paths: ["videos/**", "config.json", "scripts/**", ".github/workflows/youtube.yml"]
+  schedule:
+    - cron: "17 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      force_upload:
+        description: "Upload pending videos even if youtube_upload is false (test)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: youtube
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests
+      - name: Publish and comment
+        env:
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          FORCE_UPLOAD: ${{ inputs.force_upload && '1' || '0' }}
+        run: python scripts/yt.py
+      - name: Save state
+        if: always()
+        run: |
+          git config user.name "daily-brilliancy-bot"
+          git config user.email "dimanonorm@users.noreply.github.com"
+          git add state
+          git diff --cached --quiet || git commit -m "Update state [skip ci]"
+          git pull --rebase -q && git push
