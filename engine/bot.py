@@ -45,7 +45,11 @@ def fetch_updates(cfg):
     if "owner" in cfg:  # migrate old single-owner format
         o = cfg.pop("owner"); cfg.setdefault("owners", [])
         if o and o not in cfg["owners"]: cfg["owners"].append(o)
-    owners = cfg.setdefault("owners", []); maxo = cfg.get("max_owners", 2)
+    owners = cfg.setdefault("owners", [])
+    # roles: owners[0] sends recordings; "receiver" (main account) gets the finished videos
+    if not cfg.get("receiver") and len(owners) >= 2:
+        cfg["receiver"] = owners[1]
+    maxo = cfg.get("max_owners", 2)
     upd = tg("getUpdates", offset=cfg.get("offset", 0), timeout=0) or []
     jobs = []
     for u in upd:
@@ -56,9 +60,12 @@ def fetch_updates(cfg):
         text = m.get("text", "")
         if chat not in owners and text.startswith("/start") and len(owners) < maxo:
             owners.append(chat)
-            say(chat, "✅ Готово! Это твой личный бот Daily_Brilliancy.\n\nПрисылай записи разбора chess.com "
-                      "(лучше <b>как файл</b>, без сжатия). Я сделаю Shorts и пришлю их сюда, "
-                      "а в TikTok они упадут черновиками.")
+            if len(owners) == 1:
+                say(chat, "✅ Готово! С этого аккаунта присылай записи разбора chess.com (лучше <b>как файл</b>).")
+            else:
+                cfg["receiver"] = chat
+                say(chat, "✅ Готово! Это твой основной аккаунт: сюда будут приходить готовые Shorts, названия и хэштеги.")
+                say(owners[0], "🔗 Основной аккаунт подключён — готовые видео теперь будут приходить туда.")
             continue
         if chat not in owners:
             say(chat, "Это приватный бот."); continue
@@ -172,7 +179,14 @@ def main():
     by_chat = {}
     for p in files: by_chat.setdefault(senders.get(p.name, owners[0]), []).append(p)
     cfgp = json.loads((ROOT / "config.json").read_text())
-    results = {chat: process_inbox(chat, fs) for chat, fs in by_chat.items()}
+    recv = cfg.get("receiver")
+    for chat, fs in by_chat.items():
+        if recv and chat != recv:
+            say(chat, f"🎬 Принял записей: {len(fs)}. Готовые видео пришлю в основной аккаунт.")
+    results = {}
+    for chat, fs in by_chat.items():
+        target = recv or chat
+        results.setdefault(target, []).extend(process_inbox(target, fs))
     if any(results.values()):
         env = dict(os.environ)
         subprocess.run([sys.executable, str(ROOT / "scripts" / "yt.py")], cwd=ROOT, env=env)
