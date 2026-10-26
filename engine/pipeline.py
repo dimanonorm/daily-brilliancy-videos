@@ -5,17 +5,57 @@ import pytesseract
 ENGINE = pathlib.Path(__file__).resolve().parent
 ROOT = ENGINE.parent
 
+def board_bbox(fr):
+    b = fr.astype(np.int16)
+    light = (np.abs(b[:, :, 0] - 210) < 28) & (np.abs(b[:, :, 1] - 236) < 28) & (np.abs(b[:, :, 2] - 236) < 28)
+    dark = (np.abs(b[:, :, 0] - 86) < 30) & (np.abs(b[:, :, 1] - 150) < 30) & (np.abs(b[:, :, 2] - 118) < 30)
+    m = (light | dark).astype(np.uint8)
+    cols, rows = m.sum(0), m.sum(1)
+    if cols.max() < 50: raise RuntimeError("не нашёл шахматную доску в записи")
+    xs = np.where(cols > 0.35 * cols.max())[0]; ys = np.where(rows > 0.35 * rows.max())[0]
+    return int(xs.min()), int(ys.min()), int(xs.max() + 1), int(ys.max() + 1)
+
 def normalize(src, dst):
-    """Make sure the recording is 1920x1080 @ 60 fps (Telegram may compress 'video' uploads)."""
-    p = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
-                        "stream=width,height,r_frame_rate", "-of", "csv=p=0", src], capture_output=True, text=True).stdout.strip()
-    w, h, r = p.split(",")[:3]
-    num, den = (r.split("/") + ["1"])[:2]
-    fps = float(num) / float(den or 1)
-    if (w, h) == ("1920", "1080") and abs(fps - 60) < 0.5:
+    """Bring any recording to the standard layout: 1920x1080 @ 60 fps, board at (400,76)-(1300,976),
+    player bars above/below it. Handles other window sizes and Telegram-compressed videos."""
+    cap = cv2.VideoCapture(src)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 60
+    W, H = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)), int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+    cap.set(1, min(30, max(0, n - 1))); ok, fr = cap.read()
+    if not ok: raise RuntimeError("не удалось прочитать видео")
+    x0, y0, x1, y1 = board_bbox(fr)
+    size = ((x1 - x0) + (y1 - y0)) / 2
+    if (W, H) == (1920, 1080) and abs(fps - 60) < 0.5 and abs(x0 - 400) <= 3 and abs(y0 - 76) <= 3 and abs(size - 900) <= 4:
         return src, False
-    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-vf", "scale=1920:1080:flags=lanczos,fps=60",
-                    "-c:v", "libx264", "-crf", "10", "-preset", "veryfast", "-an", dst], check=True)
+    s = 900.0 / size
+    bg = fr[max(0, y0 // 2), min(W - 1, x1 - 6)].tolist()          # player-bar background
+    sx0, sy0 = int(round(x0 * s)), int(round(y0 * s))
+    # chess.com UI may be zoomed differently: scale the player bars so they match the standard bar height
+    sb = s if y0 * s >= 70 else min(74.0 / max(y0, 1), 2.5 * s)
+    cap = cv2.VideoCapture(src)
+    p = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "bgr24", "-s", "1920x1080",
+                          "-r", f"{fps:.5f}", "-i", "-", "-vf", "fps=60", "-c:v", "libx264", "-crf", "10", "-preset", "veryfast",
+                          "-pix_fmt", "yuv420p", dst], stdin=subprocess.PIPE)
+    while True:
+        ok, fr = cap.read()
+        if not ok: break
+        S = cv2.resize(fr, None, fx=s, fy=s, interpolation=cv2.INTER_CUBIC if s > 1 else cv2.INTER_AREA)
+        B = S if sb == s else cv2.resize(fr, None, fx=sb, fy=sb, interpolation=cv2.INTER_CUBIC)
+        out = np.empty((1080, 1920, 3), np.uint8); out[:] = bg
+        def put(img, cx0, rows_src, d0):
+            a0, a1 = max(0, rows_src[0]), min(img.shape[0], rows_src[1])
+            c0, c1 = max(0, cx0 - 8), min(img.shape[1], cx0 + 908)
+            blk = img[a0:a1, c0:c1]
+            dx = 392 + (c0 - (cx0 - 8))
+            h = min(blk.shape[0], 1080 - d0); w = min(blk.shape[1], 1920 - dx)
+            if h > 0 and w > 0: out[d0:d0 + h, dx:dx + w] = blk[:h, :w]
+        put(S, sx0, (sy0, sy0 + 900), 76)                                   # board
+        by0, by1, bx0 = int(round(y0 * sb)), int(round(y1 * sb)), int(round(x0 * sb))
+        put(B, bx0, (max(0, by0 - 74), by0), 0 if by0 >= 74 else 0)          # top player bar
+        put(B, bx0, (by1, by1 + 90), 976)                                    # bottom player bar
+        p.stdin.write(out.tobytes())
+    p.stdin.close(); p.wait()
     return dst, True
 
 def scan(path):
@@ -58,21 +98,38 @@ def orientation(fr):
     return "normal" if s[0] >= s[1] else "flipped"
 
 def ocr_name(fr, y0, y1):
-    g = cv2.cvtColor(fr[y0:y1, 460:1000], cv2.COLOR_BGR2GRAY)
-    g = 255 - cv2.resize(g, None, fx=3, fy=3, interpolation=cv2.INTER_CUBIC)
-    g = cv2.copyMakeBorder(g, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
-    t = pytesseract.image_to_string(g, config="--psm 7").strip()
-    t = re.sub(r"\(.*?\)", " ", t)                       # ratings
-    t = re.sub(r"^(GM|IM|FM|CM|WGM|WIM|WFM|NM)\s+", "", t)  # titles
-    t = re.sub(r"[^A-Za-zÀ-ÿ'\.\- ]", " ", t)
-    words = [w for w in t.split() if len(w.strip(".-'")) > 0]
-    while words and len(words[0]) == 1 and not words[0].isupper(): words.pop(0)
-    # chess.com sometimes shows "Surname Firstname I" (initial last) -> "Firstname I Surname"
-    if len(words) >= 2 and len(words[-1].strip(".")) == 1:
+    from collections import Counter
+    votes = Counter()
+    for x0 in (452, 460, 470):
+        for sc in (3, 5):
+            for mask in (False, True):
+                c = fr[y0:y1, x0:1000].astype(np.int16)
+                if mask:
+                    g = c.min(2); g[(c.max(2) - c.min(2)) > 45] = 30   # drop coloured things (GM badge, flags)
+                    g = g.astype(np.uint8)
+                else:
+                    g = cv2.cvtColor(fr[y0:y1, x0:1000], cv2.COLOR_BGR2GRAY)
+                g = 255 - cv2.resize(g, None, fx=sc, fy=sc, interpolation=cv2.INTER_CUBIC)
+                g = cv2.copyMakeBorder(g, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
+                t = clean_name(pytesseract.image_to_string(g, config="--psm 7").strip())
+                if t: votes[t] += 1
+    if not votes: return "Unknown"
+    top = max(votes.values())
+    return max((t for t, v in votes.items() if v == top), key=lambda t: sum(ch.isalpha() for ch in t))
+
+def clean_name(t):
+    t = t.split("(")[0]                                     # rating and everything after it
+    t = re.sub(r"[^A-Za-zÀ-ÿ0-9_'\.\- ]", " ", t)
+    words = [w for w in t.split() if w.strip(".-'_")]
+    while len(words) > 1 and (len(words[0].strip(".")) <= 2 or words[0].upper() in ("GM", "IM", "FM", "CM", "WGM", "WIM", "WFM", "NM")):
+        words.pop(0)                                         # avatar edge / title badge noise
+    words = [("I" + w[1:]) if len(w) > 2 and w.startswith("ll") and w[2].islower() else w for w in words]
+    if len(words) >= 2 and len(words[-1].strip(".")) == 1:   # "Surname Firstname I" -> "Firstname I Surname"
         words = words[1:] + words[:1]
-    return " ".join(w.strip(".") if len(w.strip(".")) == 1 else w for w in words).strip() or "Unknown"
+    return " ".join(w.strip(".") if len(w.strip(".")) == 1 else w for w in words).strip()
 
 def camel(display):
+    if " " not in display.strip(): return display.strip()      # chess.com nickname: keep as is
     parts = re.split(r"[\s\-\.]+", display.replace("'", ""))
     return "".join(p[:1].upper() + p[1:] for p in parts if p)
 
