@@ -55,29 +55,28 @@ jobs:
           fi
           if [ "$N" = "0" ] && [ "$INB" = "0" ]; then echo "run=no" >> $GITHUB_OUTPUT; else echo "run=yes" >> $GITHUB_OUTPUT; fi
       - if: steps.peek.outputs.run == 'yes'
-        name: Check tools
-        id: tools
+        name: Tools
+        timeout-minutes: 15
+        env:
+          DEBIAN_FRONTEND: noninteractive
+          NEEDRESTART_MODE: a
+          NEEDRESTART_SUSPEND: "1"
         run: |
-          command -v ffmpeg && echo ffmpeg=yes >> $GITHUB_OUTPUT || echo ffmpeg=no >> $GITHUB_OUTPUT
-          command -v tesseract && echo tess=yes >> $GITHUB_OUTPUT || echo tess=no >> $GITHUB_OUTPUT
-      - if: steps.peek.outputs.run == 'yes' && (steps.tools.outputs.ffmpeg == 'no' || steps.tools.outputs.tess == 'no')
-        name: apt update
-        timeout-minutes: 5
-        run: sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=3 update -qq
-      - if: steps.peek.outputs.run == 'yes' && steps.tools.outputs.tess == 'no'
-        name: install tesseract
-        timeout-minutes: 8
-        run: |
-          sudo rm -f /var/lib/man-db/auto-update || true
-          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y -qq --no-install-recommends tesseract-ocr tesseract-ocr-eng
-      - if: steps.peek.outputs.run == 'yes' && steps.tools.outputs.ffmpeg == 'no'
-        name: install ffmpeg
-        timeout-minutes: 8
-        run: sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y -qq --no-install-recommends ffmpeg
-      - if: steps.peek.outputs.run == 'yes'
-        name: pip packages
-        timeout-minutes: 8
-        run: pip install -q opencv-python-headless numpy requests pytesseract
+          pip install -q opencv-python-headless numpy requests pytesseract imageio-ffmpeg
+          if ! command -v ffmpeg >/dev/null; then
+            FF=$(python3 -c "import imageio_ffmpeg;print(imageio_ffmpeg.get_ffmpeg_exe())")
+            mkdir -p $HOME/bin && ln -sf "$FF" $HOME/bin/ffmpeg && echo "$HOME/bin" >> $GITHUB_PATH
+          fi
+          if ! command -v tesseract >/dev/null; then
+            echo 'man-db man-db/auto-update boolean false' | sudo debconf-set-selections || true
+            sudo rm -f /var/lib/man-db/auto-update || true
+            for i in 1 2 3; do
+              sudo -E timeout 240 apt-get -o DPkg::Lock::Timeout=60 -o Acquire::Retries=3 -o Dpkg::Options::=--force-confdef \
+                install -y -qq --no-install-recommends tesseract-ocr tesseract-ocr-eng && break
+              echo "retry $i"; sudo -E timeout 120 apt-get -o DPkg::Lock::Timeout=60 update -qq || true
+            done
+          fi
+          command -v tesseract && tesseract --version | head -1
       - if: steps.peek.outputs.run == 'yes'
         name: Make videos
         env:
