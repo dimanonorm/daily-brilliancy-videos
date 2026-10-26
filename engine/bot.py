@@ -22,7 +22,8 @@ def save(name, data):
     (STATE / name).write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
 
 def git(msg):
-    subprocess.run(["git", "add", "-A", "state", "inbox", "videos"], cwd=ROOT)
+    paths = [p for p in ("state", "inbox", "videos") if (ROOT / p).exists()]
+    subprocess.run(["git", "add", "-A", "--"] + paths, cwd=ROOT)
     if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=ROOT).returncode:
         subprocess.run(["git", "commit", "-qm", msg], cwd=ROOT, check=True)
         for _ in range(3):
