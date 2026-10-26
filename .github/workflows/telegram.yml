@@ -1,12 +1,7 @@
 name: Telegram bot
 
 on:
-  push:
-    branches: [main]
-    paths: ["engine/**", ".github/workflows/telegram.yml"]
-  schedule:
-    - cron: "*/5 * * * *"
-  workflow_dispatch:
+  workflow_dispatch:   # bot switched off by the owner (2026-10-26)
 
 permissions:
   contents: write
