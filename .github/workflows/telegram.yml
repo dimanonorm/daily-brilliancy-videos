@@ -1,0 +1,49 @@
+name: Telegram bot
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tiktok
+  cancel-in-progress: false
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - name: Quick check for new messages
+        id: peek
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+        run: |
+          OFF=$(python3 -c "import json,os;print(json.load(open('state/telegram.json')).get('offset',0) if os.path.exists('state/telegram.json') else 0)")
+          N=$(curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/getUpdates?offset=${OFF}&timeout=0" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('result',[])))")
+          INB=$(ls inbox 2>/dev/null | grep -v failed | wc -l)
+          echo "new=$N inbox=$INB"
+          if [ "$N" = "0" ] && [ "$INB" = "0" ]; then echo "run=no" >> $GITHUB_OUTPUT; else echo "run=yes" >> $GITHUB_OUTPUT; fi
+      - if: steps.peek.outputs.run == 'yes'
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq tesseract-ocr ffmpeg > /dev/null
+          pip install -q opencv-python-headless numpy requests pytesseract
+      - if: steps.peek.outputs.run == 'yes'
+        name: Make videos
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          SONGS_KEY: ${{ secrets.SONGS_KEY }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_TOKEN: ${{ secrets.YT_REFRESH_TOKEN }}
+          TT_CLIENT_KEY: ${{ secrets.TT_CLIENT_KEY }}
+          TT_CLIENT_SECRET: ${{ secrets.TT_CLIENT_SECRET }}
+          TT_TOKEN_KEY: ${{ secrets.TT_TOKEN_KEY }}
+        run: |
+          git config user.name "daily-brilliancy-bot"
+          git config user.email "dimanonorm@users.noreply.github.com"
+          python engine/bot.py
