@@ -2,7 +2,7 @@
 - token secret present: True
 - songs key present: True
 - api ok: True 
-- pending updates: 1
+- pending updates: 13
 - bot: Daily Brilliancy Maker @Daily_Brilliancy_Maker_bot
-- webhook set: False pending: 1
-- checked at: 2026-10-26T17:52:32.185150Z
+- webhook set: False pending: 13
+- checked at: 2026-10-26T18:00:39.347342Z
