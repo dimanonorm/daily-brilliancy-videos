@@ -86,6 +86,9 @@ def fetch_updates(cfg):
         INBOX.mkdir(exist_ok=True)
         stamp = datetime.datetime.utcfromtimestamp(m["date"]).strftime("%Y%m%d-%H%M%S")
         dst = INBOX / f"{stamp}-{m['message_id']}-{''.join(c for c in name if c.isalnum() or c in '._-')}"
+        orig = dst.name.split("-", 3)[-1]
+        if any(x.name.split("-", 3)[-1] == orig for x in INBOX.glob("*") if x.is_file()):
+            say(chat, f"↩️ {html.escape(name)} уже в очереди — пропускаю дубликат."); continue
         dst.write_bytes(data)
         senders = load("inbox_senders.json", {}); senders[dst.name] = chat; save("inbox_senders.json", senders)
         jobs.append(dst.name)
