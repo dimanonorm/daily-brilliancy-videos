@@ -55,11 +55,29 @@ jobs:
           fi
           if [ "$N" = "0" ] && [ "$INB" = "0" ]; then echo "run=no" >> $GITHUB_OUTPUT; else echo "run=yes" >> $GITHUB_OUTPUT; fi
       - if: steps.peek.outputs.run == 'yes'
+        name: Check tools
+        id: tools
+        run: |
+          command -v ffmpeg && echo ffmpeg=yes >> $GITHUB_OUTPUT || echo ffmpeg=no >> $GITHUB_OUTPUT
+          command -v tesseract && echo tess=yes >> $GITHUB_OUTPUT || echo tess=no >> $GITHUB_OUTPUT
+      - if: steps.peek.outputs.run == 'yes' && (steps.tools.outputs.ffmpeg == 'no' || steps.tools.outputs.tess == 'no')
+        name: apt update
+        timeout-minutes: 5
+        run: sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=3 update -qq
+      - if: steps.peek.outputs.run == 'yes' && steps.tools.outputs.tess == 'no'
+        name: install tesseract
+        timeout-minutes: 8
         run: |
           sudo rm -f /var/lib/man-db/auto-update || true
-          NEED=""; command -v tesseract >/dev/null || NEED="$NEED tesseract-ocr"; command -v ffmpeg >/dev/null || NEED="$NEED ffmpeg"
-          if [ -n "$NEED" ]; then sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends $NEED > /dev/null; fi
-          pip install -q opencv-python-headless numpy requests pytesseract
+          sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y -qq --no-install-recommends tesseract-ocr tesseract-ocr-eng
+      - if: steps.peek.outputs.run == 'yes' && steps.tools.outputs.ffmpeg == 'no'
+        name: install ffmpeg
+        timeout-minutes: 8
+        run: sudo DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout=120 install -y -qq --no-install-recommends ffmpeg
+      - if: steps.peek.outputs.run == 'yes'
+        name: pip packages
+        timeout-minutes: 8
+        run: pip install -q opencv-python-headless numpy requests pytesseract
       - if: steps.peek.outputs.run == 'yes'
         name: Make videos
         env:
