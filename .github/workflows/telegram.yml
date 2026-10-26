@@ -30,6 +30,8 @@ jobs:
           OFF=$(python3 -c "import json,os;print(json.load(open('state/telegram.json')).get('offset',0) if os.path.exists('state/telegram.json') else 0)")
           TOK=$(echo -n "$TG_BOT_TOKEN" | tr -d '[:space:]')
           curl -s "https://api.telegram.org/bot${TOK}/getUpdates?offset=${OFF}&timeout=0" > /tmp/upd.json
+          curl -s "https://api.telegram.org/bot${TOK}/getMe" > /tmp/me.json
+          curl -s "https://api.telegram.org/bot${TOK}/getWebhookInfo" > /tmp/wh.json
           N=$(python3 -c "import json;print(len(json.load(open('/tmp/upd.json')).get('result',[])))")
           INB=$(ls inbox 2>/dev/null | grep -v failed | wc -l)
           echo "new=$N inbox=$INB"
@@ -42,6 +44,11 @@ jobs:
           print("- songs key present:", bool(os.environ.get('SONGS_KEY','').strip()))
           print("- api ok:", d.get('ok'), d.get('description',''))
           print("- pending updates:", len(d.get('result',[])))
+          me=json.load(open('/tmp/me.json')).get('result',{})
+          print("- bot:", me.get('first_name'), '@'+str(me.get('username')))
+          wh=json.load(open('/tmp/wh.json')).get('result',{})
+          print("- webhook set:", bool(wh.get('url')), "pending:", wh.get('pending_update_count'))
+          import datetime; print("- checked at:", datetime.datetime.utcnow().isoformat()+"Z")
           PY
             git config user.name "daily-brilliancy-bot"; git config user.email "dimanonorm@users.noreply.github.com"
             git add state/telegram_check.md; git commit -qm "Bot: check [skip ci]" || true; git pull --rebase -q; git push -q || true
