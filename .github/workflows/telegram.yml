@@ -25,11 +25,27 @@ jobs:
         id: peek
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          SONGS_KEY: ${{ secrets.SONGS_KEY }}
         run: |
           OFF=$(python3 -c "import json,os;print(json.load(open('state/telegram.json')).get('offset',0) if os.path.exists('state/telegram.json') else 0)")
-          N=$(curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/getUpdates?offset=${OFF}&timeout=0" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('result',[])))")
+          TOK=$(echo -n "$TG_BOT_TOKEN" | tr -d '[:space:]')
+          curl -s "https://api.telegram.org/bot${TOK}/getUpdates?offset=${OFF}&timeout=0" > /tmp/upd.json
+          N=$(python3 -c "import json;print(len(json.load(open('/tmp/upd.json')).get('result',[])))")
           INB=$(ls inbox 2>/dev/null | grep -v failed | wc -l)
           echo "new=$N inbox=$INB"
+          if [ "${{ github.event_name }}" = "push" ]; then
+            python3 - <<'PY' > state/telegram_check.md
+          import json,os
+          d=json.load(open('/tmp/upd.json'))
+          print("# Telegram check")
+          print("- token secret present:", bool(os.environ.get('TG_BOT_TOKEN','').strip()))
+          print("- songs key present:", bool(os.environ.get('SONGS_KEY','').strip()))
+          print("- api ok:", d.get('ok'), d.get('description',''))
+          print("- pending updates:", len(d.get('result',[])))
+          PY
+            git config user.name "daily-brilliancy-bot"; git config user.email "dimanonorm@users.noreply.github.com"
+            git add state/telegram_check.md; git commit -qm "Bot: check [skip ci]" || true; git pull --rebase -q; git push -q || true
+          fi
           if [ "$N" = "0" ] && [ "$INB" = "0" ]; then echo "run=no" >> $GITHUB_OUTPUT; else echo "run=yes" >> $GITHUB_OUTPUT; fi
       - if: steps.peek.outputs.run == 'yes'
         run: |
