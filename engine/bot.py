@@ -42,6 +42,10 @@ def say(chat, text):
     return tg("sendMessage", chat_id=chat, text=text, parse_mode="HTML", disable_web_page_preview="true")
 
 def fetch_updates(cfg):
+    if "owner" in cfg:  # migrate old single-owner format
+        o = cfg.pop("owner"); cfg.setdefault("owners", [])
+        if o and o not in cfg["owners"]: cfg["owners"].append(o)
+    owners = cfg.setdefault("owners", []); maxo = cfg.get("max_owners", 2)
     upd = tg("getUpdates", offset=cfg.get("offset", 0), timeout=0) or []
     jobs = []
     for u in upd:
@@ -49,19 +53,20 @@ def fetch_updates(cfg):
         m = u.get("message") or {}
         chat = m.get("chat", {}).get("id")
         if not chat: continue
-        if cfg.get("owner") is None and m.get("text", "").startswith("/start"):
-            cfg["owner"] = chat
+        text = m.get("text", "")
+        if chat not in owners and text.startswith("/start") and len(owners) < maxo:
+            owners.append(chat)
             say(chat, "✅ Готово! Это твой личный бот Daily_Brilliancy.\n\nПрисылай записи разбора chess.com "
                       "(лучше <b>как файл</b>, без сжатия). Я сделаю Shorts и пришлю их сюда, "
                       "а в TikTok они упадут черновиками.")
             continue
-        if chat != cfg.get("owner"):
+        if chat not in owners:
             say(chat, "Это приватный бот."); continue
         f = m.get("document") or m.get("video")
         if not f:
-            if m.get("text", "").startswith("/start"):
+            if text.startswith("/start"):
                 say(chat, "Я на связи. Присылай записи разбора — лучше как файл.")
-            elif m.get("text"):
+            elif text:
                 say(chat, "Присылай записи разбора (видео-файлы .mkv/.mp4). Текст я не обрабатываю.")
             continue
         if f.get("file_size", 0) > 20 * 1024 * 1024:
@@ -75,6 +80,7 @@ def fetch_updates(cfg):
         stamp = datetime.datetime.utcfromtimestamp(m["date"]).strftime("%Y%m%d-%H%M%S")
         dst = INBOX / f"{stamp}-{m['message_id']}-{''.join(c for c in name if c.isalnum() or c in '._-')}"
         dst.write_bytes(data)
+        senders = load("inbox_senders.json", {}); senders[dst.name] = chat; save("inbox_senders.json", senders)
         jobs.append(dst.name)
     return jobs
 
@@ -112,8 +118,7 @@ def unique_name(white, black):
 def slugify(s):
     return "".join(c.lower() if c.isalnum() else "-" for c in s).strip("-").replace("--", "-")
 
-def process_inbox(chat):
-    files = sorted(p for p in INBOX.glob("*") if p.is_file()) if INBOX.exists() else []
+def process_inbox(chat, files):
     if not files: return []
     say(chat, f"🎬 Принял записей: {len(files)}. Делаю видео…")
     done = []
@@ -136,7 +141,7 @@ def process_inbox(chat):
                 (VIDEOS / f"{slug}.json").write_text(json.dumps({
                     "title": title, "description": tags, "hashtags": tags, "tags": [t[1:] for t in tags.split()],
                     "tiktok_caption": caption, "game": name, "song": song["name"]}, indent=2, ensure_ascii=False) + "\n")
-            p.unlink()
+            p.unlink(); senders = load("inbox_senders.json", {}); senders.pop(p.name, None); save("inbox_senders.json", senders)
             git(f"Bot: {name}")
             with open(mp4, "rb") as fh:
                 tg("sendVideo", chat_id=chat, caption=f"{name} (youtube)", supports_streaming="true",
@@ -157,22 +162,27 @@ def process_inbox(chat):
 
 def main():
     cfg = load("telegram.json", {})
-    jobs = fetch_updates(cfg)
+    fetch_updates(cfg)
     save("telegram.json", cfg)
     git("Bot: inbox")
-    chat = cfg.get("owner")
-    if not chat: print("No owner yet (send /start to the bot)."); return
-    done = process_inbox(chat)
-    if done:
-        cfgp = json.loads((ROOT / "config.json").read_text())
+    owners = cfg.get("owners", [])
+    if not owners: print("No owner yet (send /start to the bot)."); return
+    files = sorted(p for p in INBOX.glob("*") if p.is_file()) if INBOX.exists() else []
+    senders = load("inbox_senders.json", {})
+    by_chat = {}
+    for p in files: by_chat.setdefault(senders.get(p.name, owners[0]), []).append(p)
+    cfgp = json.loads((ROOT / "config.json").read_text())
+    results = {chat: process_inbox(chat, fs) for chat, fs in by_chat.items()}
+    if any(results.values()):
         env = dict(os.environ)
         subprocess.run([sys.executable, str(ROOT / "scripts" / "yt.py")], cwd=ROOT, env=env)
         subprocess.run([sys.executable, str(ROOT / "scripts" / "tiktok.py"), "publish"], cwd=ROOT, env=env)
         git("Bot: publish state")
-        lines = "\n".join(done)
-        tt = load("tiktok_uploaded.json", {})
+    tt = load("tiktok_uploaded.json", {})
+    for chat, done in results.items():
+        if not done: continue
         sent = sum(1 for n in done if slugify(n) in tt)
-        msg = f"✅ Готово, видео: {len(done)}\n\n<code>{html.escape(lines)}</code>\n\n"
+        msg = f"✅ Готово, видео: {len(done)}\n\n<code>{html.escape(chr(10).join(done))}</code>\n\n"
         if cfgp.get("tiktok_mode") == "inbox": msg += f"📱 В TikTok черновиками отправлено: {sent}. Открой TikTok → вставь подпись → «Опубликовать».\n"
         if not cfgp.get("youtube_upload"): msg += "▶️ YouTube: загрузи файлы выше (название и хэштеги — в сообщениях). Комментарий добавится сам."
         say(chat, msg)
