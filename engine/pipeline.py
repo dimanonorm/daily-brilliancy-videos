@@ -52,7 +52,7 @@ def normalize(src, dst):
             if h > 0 and w > 0: out[d0:d0 + h, dx:dx + w] = blk[:h, :w]
         put(S, sx0, (sy0, sy0 + 900), 76)                                   # board
         by0, by1, bx0 = int(round(y0 * sb)), int(round(y1 * sb)), int(round(x0 * sb))
-        put(B, bx0, (max(0, by0 - 74), by0), 0 if by0 >= 74 else 0)          # top player bar
+        put(B, bx0, (max(0, by0 - 76), by0 - 2), 0)                         # top player bar (stop before the board edge line)
         put(B, bx0, (by1, by1 + 90), 976)                                    # bottom player bar
         p.stdin.write(out.tobytes())
     p.stdin.close(); p.wait()
