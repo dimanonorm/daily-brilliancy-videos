@@ -1,7 +1,7 @@
 name: Telegram bot
 
 on:
-  workflow_dispatch:   # bot switched off by the owner (2026-10-26)
+  workflow_dispatch:   # bot switched off by the owner (2026-10-27)
 
 permissions:
   contents: write
